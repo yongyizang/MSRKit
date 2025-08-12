@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MSR Challenge Submission Guidelines</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #222;
+      line-height: 1.8;
+      max-width: 950px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    ul {
+      margin: 15px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    pre {
+      background: #1e1e1e;
+      color: #dcdcdc;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .highlight {
+      background: #eef6ff;
+      border-left: 5px solid #3498db;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>MSR Challenge Submission Format</h1>
+
+  <h2>Overview</h2>
+  <p>
+    Your submission must be a <code>.zip</code> file containing <b>exactly eight stem folders</b>, each corresponding to one instrument/vocal type.
+    Each folder must contain <b>exactly 125 WAV files</b> (one per clip), named according to the provided file list (e.g., <code>clip_0000.wav</code>, <code>clip_0001.wav</code>, ...).
+  </p>
+
+  <div class="highlight">
+    <strong>Important:</strong> The folder names, file counts, and filenames must exactly match the reference data.  
+    Missing or extra files will cause the scoring to fail.
+  </div>
+
+  <h2>Expected Folder Structure</h2>
+  <pre>
+submission.zip
+├── bass
+│   ├── clip_0000.wav
+│   ├── clip_0001.wav
+│   ├── ...
+│   └── clip_0124.wav
+├── drums
+│   ├── clip_0000.wav
+│   ├── ...
+│   └── clip_0124.wav
+├── guitars
+│   ├── clip_0000.wav
+│   └── ...
+├── keyboards
+│   ├── clip_0000.wav
+│   └── ...
+├── orchestral
+│   ├── clip_0000.wav
+│   └── ...
+├── percussion
+│   ├── clip_0000.wav
+│   └── ...
+├── synthesizers
+│   ├── clip_0000.wav
+│   └── ...
+└── vocals
+    ├── clip_0000.wav
+    └── ...
+  </pre>
+
+  <h2>Stem Folders (Must Match Exactly)</h2>
+  <ul>
+    <li><code>bass</code></li>
+    <li><code>drums</code></li>
+    <li><code>guitars</code></li>
+    <li><code>keyboards</code></li>
+    <li><code>orchestral</code></li>
+    <li><code>percussion</code></li>
+    <li><code>synthesizers</code></li>
+    <li><code>vocals</code></li>
+  </ul>
+
+  <h2>File Format Requirements</h2>
+  <ul>
+    <li>Format: <strong>16-bit PCM WAV</strong></li>
+    <li>Sample rate: <strong>44.1 kHz</strong> or higher (scoring will resample as needed)</li>
+    <li>Mono or stereo — match original stem characteristics</li>
+    <li>File names must exactly match the reference names (case-sensitive)</li>
+  </ul>
+
+  <h2>Packaging Your Submission</h2>
+  <p>
+    <strong>Do NOT</strong> zip the folder containing your stems. Instead, zip the stems themselves from the submission root directory.
+    This ensures that the root of the zip contains the 8 stem folders directly, not an extra folder level.
+  </p>
+  <p>✅ Correct way:</p>
+  <pre>
+cd /path/to/submission_root
+zip -r submission.zip bass drums guitars keyboards orchestral percussion synthesizers vocals
+  </pre>
+  <p>❌ Incorrect way (will create an extra folder level inside the zip):</p>
+  <pre>
+cd /path/to
+zip -r submission.zip submission_root
+  </pre>
+
+  <h2>Submission Checklist</h2>
+  <ul>
+    <li>✅ The <code>.zip</code> contains exactly <b>8 folders</b> (one for each stem)</li>
+    <li>✅ Each folder contains exactly <b>125 files</b></li>
+    <li>✅ All filenames match the provided reference list (<code>clip_0000.wav</code> → <code>clip_0124.wav</code>)</li>
+    <li>✅ No missing or extra files</li>
+    <li>✅ No nested subfolders inside stem folders</li>
+    <li>✅ All files are valid WAV format and loadable</li>
+  </ul>
+
+</body>
+</html>

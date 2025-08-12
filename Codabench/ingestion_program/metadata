@@ -1,0 +1,2 @@
+command: python3 /app/program/ingestion.py
+description: Copy submitted wavs to /app/output for scoring

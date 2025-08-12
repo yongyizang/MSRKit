@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MSR Challenge Dataset</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #222;
+      line-height: 2.3;
+      max-width: 950px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    .highlight {
+      background: #eef6ff;
+      border-left: 5px solid #3498db;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+    ul {
+      margin: 15px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 15px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th {
+      background: #3498db;
+      color: #fff;
+      padding: 10px;
+      text-align: left;
+    }
+    td {
+      padding: 8px;
+      background: #fff;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .emoji {
+      font-size: 1.2em;
+    }
+    a {
+      color: #3498db;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Data Description</h1>
+
+  <h2>
+    Training set
+  </h2>
+
+  <p>
+    Participants are free to use any academic open datasets. Organizers will provide a <a href="#">baseline script</a> for synthetic mixture generation.
+  </p>
+
+
+  <h2>
+    Validation set
+  </h2>
+
+  <p>
+    A validation set of 1000 10-second audio mixture clips and individual stem pairs will be released to help participants develop their systems.
+  </p>
+
+  <h2> Test Set </h2>
+  <p><b>Release Date:</b> 48 hours before the final submission deadline.</p>
+  <p>Two subsets will comprehensively assess restoration capabilities:</p>
+  <ul>
+    <li><b>Non-Blind Test (1,000 clips):</b> Professionally mixed and mastered commercial songs with ground-truth stems for calculating intrusive metrics.</li>
+    <li><b>Blind Test (500 clips):</b> Real-world degradation scenarios:
+      <ul>
+        <li><b>Storage Degradation (125 clips):</b> Historical recordings from the UCSD Cylinder Audio Archive.</li>
+        <li><b>Environmental Degradation (125 clips):</b> Live YouTube performances with venue acoustics and crowd noise.</li>
+        <li><b>Analog Transmission (125 clips):</b> FM radio broadcasts.</li>
+        <li><b>Digital Transmission (125 clips):</b> Music streamed under low bitrates and lossy codecs.</li>
+      </ul>
+    </li>
+  </ul>
+
+
+  <h2>📂 Data Format and File Structure</h2>
+  <p>The dataset includes multitrack audio stems and synthetic mixtures:</p>
+  <ul>
+    <li><code>.wav</code>: High-quality audio files for each stem and mixture.</li>
+    <li><code>.json</code>: Metadata for each mixture (source stems, applied effects, transformations).</li>
+    <li><code>.csv</code>: Track list with stem labels and split information (train/val/test).</li>
+  </ul>
+
+  <h2>📝 Metadata Fields</h2>
+  <table>
+    <tr>
+      <th>Field</th>
+      <th>Description</th>
+    </tr>
+    <tr>
+      <td><code>track_id</code></td>
+      <td>Unique identifier for each audio mixture.</td>
+    </tr>
+    <tr>
+      <td><code>stem_name</code></td>
+      <td>Name of the instrument stem (vocals, guitar, drums, etc.).</td>
+    </tr>
+    <tr>
+      <td><code>effect_chain</code></td>
+      <td>Applied transformations (EQ, reverb, compression, distortion, etc.).</td>
+    </tr>
+    <tr>
+      <td><code>split</code></td>
+      <td>Dataset partition: train, validation, or test.</td>
+    </tr>
+    <tr>
+      <td><code>duration</code></td>
+      <td>Length of the audio clip in seconds.</td>
+    </tr>
+  </table>
+
+  <h2>🔊 Example</h2>
+  <pre>
+track_id: 00123
+stem_name: vocals
+effect_chain: [EQ, Reverb, Compression]
+split: validation
+duration: 10.0
+  </pre>
+
+</html>

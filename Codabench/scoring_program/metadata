@@ -1,0 +1,2 @@
+command: python3 /app/program/score.py --solution_dir=/app/data/reference_data --prediction_dir=/app/input/res/ --score_dir=/app/output/ --skip_ingestion
+description: Compute SI-SNR and FAD_CLAP score for the music restoration challenge

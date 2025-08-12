@@ -1,0 +1,61 @@
+version: 2
+title: "Music Restoration Challenge"
+description: "Recover clean music waveforms from distorted inputs. Ranking is by SI-SNR and FAD-CLAP."
+docker_image: wanyingge/pytorch-speech:2.8.0-cu126
+image: logo.png
+
+make_programs_available: True
+registration_auto_approve: True
+make_input_data_available: True
+
+pages:
+  - title: Overview
+    file: overview.html
+  - title: Data Description
+    file: data.html
+  - title: Submission Format
+    file: submission.html
+  - title: Evaluation Metrics
+    file: evaluation.html
+  - title: Terms
+    file: terms.html
+
+terms: terms.html
+
+tasks:
+  - index: 0
+    name: SI-SNR / FAD-CLAP
+    input_data: input_data/
+    scoring_program: scoring_program/
+    reference_data: reference_data/
+
+phases:
+  - index: 0
+    name: Validation
+    description: "Validation phase: tune your models and submit restored audio for the validation set"
+    start: 2025-09-01 00:00:00
+    end: 2025-11-17 23:59:59
+    max_submissions_per_day: 2000
+    max_submissions: 2000
+    tasks: [0]
+  - index: 1
+    name: Test
+    description: "Test phase: submit restored audio for the test set"
+    start: 2025-11-18 00:00:00
+    end: 2025-11-20 23:59:59
+    max_submissions_per_day: 3
+    max_submissions: 3
+    tasks: [0]
+
+leaderboards:
+  - title: Results
+    key: main
+    columns:
+      - title: SI-SNR (dB)
+        key: si_snr
+        index: 0
+        sorting: desc
+      - title: FAD-CLAP
+        key: fad_clap
+        index: 1
+        sorting: asc

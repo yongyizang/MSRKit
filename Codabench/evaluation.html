@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MSR Challenge Evaluation</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #222;
+      line-height: 2.3;
+      max-width: 950px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+    .highlight {
+      background: #eef6ff;
+      border-left: 5px solid #3498db;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+    ul {
+      margin: 15px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre {
+      background: #1e1e1e;
+      color: #dcdcdc;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Evaluation Metrics</h1>
+
+  <h2>Validation Phase</h2>
+  <p>
+    During validation, submission results are displayed immediately. You may submit as many times as you'd like.  
+    This phase includes <b>2 tracks</b>:
+  </p>
+
+  <ul>
+    <li>
+      <b>Track 1: Reconstruction-Dominant</b>,  
+      ranked by Scale-Invariant Signal-to-Noise Ratio (SI-SNR) 
+      <br><b>What it measures:</b> How closely your restored audio matches the original waveform.  
+      <br><b>Why it matters:</b> Ensures signal-level fidelity and accurate recovery of original stems.
+    </li>
+    <li>
+      <b>Track 2: Semantic Alignment-Dominant</b>, ranked by Fréchet Audio Distance on CLAP embeddings (FAD-CLAP)  
+      <br><b>What it measures:</b> Perceptual and structural similarity using audio-language embeddings.  
+      <br><b>Why it matters:</b> Rewards systems that capture musical meaning and coherence, not just raw waveform accuracy.
+    </li>
+  </ul>
+
+  Submissions in validation phase are ranked by their performance in each track on validation set released by the organizers.
+
+<h2>Test Phase</h2>
+  <p>
+    This phase adds a third track:
+  </p>
+<ul>
+  <li>
+    <b>Track 3: Perceptual Quality</b>, ranked by Mean Opinion Scores (MOS)
+    <br><b>What it measures:</b> Human listeners (professional mixing engineers and producers) rate the audio 
+    on separation quality, restoration fidelity, and overall perceptual quality.  
+    <br><b>Why it matters:</b> Ensures that restored audio is not only technically accurate 
+    but also sounds natural, musical, and enjoyable to human ears.
+  </li>
+</ul>
+  <p>
+    In this phase, objective metric (SI-SNR and FAD-CLAP) results will be displayed immediately; subjective metric (MOS) results will be announced after test phase.
+  </p>
+
+  <h2>Final Ranking</h2>
+  <p>
+    Submissions in test phase are ranked across all <b>seven target stems</b> through <b>three tracks</b> on test sets (both bon-blind subset and blind subset):
+  </p>
+  <ul>
+    <li><b>Track 1: Signal Reconstruction</b> — Based on SI-SNR.</li>
+    <li><b>Track 2: Semantic Alignment</b> — Based on FAD-CLAP.</li>
+    <li><b>Track 3: Perceptual Quality</b> — Based on MOS evaluations.</li>
+  </ul>
+  <p>
+    The <b>Top 5 participants</b> in the combined rankings of <b>Track 1 and Track 2</b> will be invited to submit a <b>2-page short paper</b> describing their methodology.
+  </p>
+
+  <h2>Details on Subjective Evaluation (MOS)</h2>
+  <p>
+    Each blind test clip will receive <b>three MOS ratings</b> from audio professionals:
+  </p>
+  <ul>
+    <li><b>MOS-Separation:</b> How well the target instrument is isolated with no interference.</li>
+    <li><b>MOS-Restoration:</b> How close the instrument sounds to its original undegraded form.</li>
+    <li><b>MOS-Overall:</b> Overall perceptual quality and similarity to the reference stem.</li>
+  </ul>
+  <p>
+    MOS-Separation and MOS-Restoration are used for analysis, while <b>MOS-Overall</b> determines the final ranking for <b>Track 3</b>.
+  </p>
+
+</body>
+</html>
