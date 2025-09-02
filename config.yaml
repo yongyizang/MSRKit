@@ -1,0 +1,70 @@
+project_name: "msrkit"
+exp_name: "melroformer_vocal_restoration"
+
+model:
+  name: "MelRoFormer"
+  params:
+    hidden_channels: 128
+    num_layers: 12
+    num_heads: 4
+    window_size: 2048
+    hop_size: 512
+    sample_rate: 44100
+
+discriminators:
+  - name: "MultiFrequencyDiscriminator"
+    params:
+      nch: 1
+      window_sizes: [2048, 1024, 512]
+      sample_rate: 44100
+      norm: True
+  # you can add more discriminators here
+
+data:
+  sample_rate: 44100
+  clip_duration: 3.0
+  train_dataset:
+    target_stem: "Voc"
+    root_directory: "/path/to/your/training/data"
+    file_list: "/path/to/your/train_split.txt"
+    apply_augmentation: True
+    snr_range: [0.0, 10.0]
+  val_dataset:
+    target_stem: "Voc"
+    root_directory: "/path/to/your/validation/data"
+    file_list: "/path/to/your/val_split.txt"
+    apply_augmentation: True
+    snr_range: [5.0, 5.0] # Fixed SNR for validation
+  dataloader_params:
+    batch_size: 4
+    num_workers: 8
+
+optimizer_g:
+  lr: 0.0002
+  betas: [0.8, 0.99]
+
+optimizer_d:
+  lr: 0.0002
+  betas: [0.8, 0.99]
+
+scheduler:
+  warm_up_steps: 10000
+
+losses:
+  gan_type: 'lsgan'
+  lambda_recon: 100.0
+  lambda_feat: 2.0
+  lambda_gan: 1.0
+  reconstruction_loss:
+    sample_rate: 44100
+    n_fft: [1024, 2048, 512]
+    hop_length: [256, 512, 128]
+    n_mels: [80, 160, 40]
+
+trainer:
+  max_steps: 1000000
+  val_check_interval: 5000
+  log_every_n_steps: 100
+  devices: [0] # List of GPU IDs to use
+  precision: bf16-mixed
+  log_media_every_n_steps: 5000
