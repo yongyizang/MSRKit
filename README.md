@@ -8,25 +8,18 @@ We have designed the repository to be a GAN-based framework; to learn more about
 
 The repository is organized to separate concerns, making it easy to extend and maintain. Click on a directory to learn more about its contents.
 
-```
-MSRKit/
-├── README.md                 <- You are here
-├── config.yaml               <- Main configuration file for experiments
-├── train.py                  <- Main script to start training
-├── unwrap.py                 <- Utility to extract generator weights from a checkpoint
-│
-├── data/                     <- [Data loading and augmentation](./data/README.md)
-│
-├── evaluation/               <- [Evaluation metrics](./evaluation/README.md)
-│
-├── losses/                   <- [Loss function implementations](./losses/README.md)
-│
-├── models/                   <- [Top-level generator model architectures](./models/README.md)
-│
-└── modules/                  <- [Core building blocks for models](./modules/README.md)
-    ├── discriminator/        <- [Discriminator architectures](./modules/discriminator/README.md)
-    └── generator/            <- [Reusable generator components](./modules/generator/README.md)
-```
+`MSRKit/`
+- `README.md`                 <- You are here
+- `config.yaml`               <- Main configuration file for experiments
+- `train.py`                  <- Main script to start training
+- `unwrap.py`                 <- Utility to extract generator weights from a checkpoint
+- `data/`                     <- [Data loading and augmentation](./data/README.md)
+- `evaluation/`               <- [Evaluation metrics](./evaluation/README.md)
+- `losses/`                   <- [Loss function implementations](./losses/README.md)
+- `models/`                   <- [Top-level generator model architectures](./models/README.md)
+- `modules/`                  <- [Core building blocks for models](./modules/README.md)
+     - `discriminator/`       <- [Discriminator architectures](./modules/discriminator/README.md)
+     - `generator/`           <- [Reusable generator components](./modules/generator/README.md)
 
 ## 🚀 Getting Started
 
