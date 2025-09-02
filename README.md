@@ -18,8 +18,8 @@ The repository is organized to separate concerns, making it easy to extend and m
 - `losses/`                   <- [Loss function implementations](./losses/README.md)
 - `models/`                   <- [Top-level generator model architectures](./models/README.md)
 - `modules/`                  <- [Core building blocks for models](./modules/README.md)
-     - `discriminator/`       <- [Discriminator architectures](./modules/discriminator/README.md)
-     - `generator/`           <- [Reusable generator components](./modules/generator/README.md)
+     - `discriminator/`       <- Discriminator architectures
+     - `generator/`           <- Reusable generator components
 
 ## 🚀 Getting Started
 
