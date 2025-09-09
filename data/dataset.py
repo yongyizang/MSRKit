@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import librosa
 import soundfile as sf
+import json
 from typing import List, Optional, Dict, Union, Tuple, Any
 from torch.utils.data import Dataset, Sampler
 from tqdm import tqdm
@@ -21,97 +22,60 @@ def calculate_rms(audio: np.ndarray) -> float:
 def contains_audio_signal(audio: np.ndarray, rms_threshold: float = 0.01) -> bool:
     if audio is None:
         return False
-    
-    rms = calculate_rms(audio)
-    return rms > rms_threshold
+    return calculate_rms(audio) > rms_threshold
 
 def fix_length(target: np.ndarray, source: np.ndarray) -> np.ndarray:
-    target_length = target.shape[-1]
-    source_length = source.shape[-1]
-
+    target_length, source_length = target.shape[-1], source.shape[-1]
     if target_length < source_length:
-        target = np.pad(target, ((0, 0), (0, source_length - target_length)), mode='constant')
-    elif target_length > source_length:
-        target = target[:, :source_length]
-
+        return np.pad(target, ((0, 0), (0, source_length - target_length)), mode='constant')
+    if target_length > source_length:
+        return target[:, :source_length]
     return target
 
 def fix_length_to_duration(target: np.ndarray, duration: float, sr: int) -> np.ndarray:
     target_length = target.shape[-1]
-    target_duration = target_length / sr
-
-    if target_duration < duration:
-        target = np.pad(target, ((0, 0), (0, int((duration - target_duration) * sr))), mode='constant')
-    elif target_duration > duration:
-        target = target[:, :int(duration * sr)]
-
+    required_length = int(duration * sr)
+    if target_length < required_length:
+        return np.pad(target, ((0, 0), (0, required_length - target_length)), mode='constant')
+    if target_length > required_length:
+        return target[:, :required_length]
     return target
-
 
 def get_audio_duration(file_path: Path) -> float:
     try:
-        info = sf.info(file_path)
-        return info.duration
+        return sf.info(file_path).duration
     except Exception as e:
         logger.error(f"Error getting duration for {file_path}: {e}")
         return 0.0
 
-
-def load_audio(
-    file_path: Path, 
-    offset: float, 
-    duration: float, 
-    sr: int
-) -> np.ndarray:
+def load_audio(file_path: Path, offset: float, duration: float, sr: int) -> np.ndarray:
     try:
-        audio, _ = librosa.load(
-            file_path, 
-            sr=sr, 
-            offset=offset, 
-            duration=duration,
-            mono=False
-        )
-        
-        if len(audio.shape) == 1:
-            audio = audio.reshape(1, -1)
-                
-        if audio.shape[1] == 0:
-            return np.zeros((2, int(sr * duration)))
-        
-        if audio.shape[0] == 1:
-            audio = np.vstack([audio, audio])
-        
+        audio, _ = librosa.load(file_path, sr=sr, offset=offset, duration=duration, mono=False)
+        if len(audio.shape) == 1: audio = audio.reshape(1, -1)
+        if audio.shape[1] == 0: return np.zeros((2, int(sr * duration)))
+        if audio.shape[0] == 1: audio = np.vstack([audio, audio])
         return audio
     except Exception as e:
         logger.error(f"Error loading {file_path} at offset {offset}: {e}")
         return np.zeros((2, int(sr * duration)))
 
 def mix_to_target_snr(target: np.ndarray, noise: np.ndarray, target_snr_db: float) -> Tuple[np.ndarray, float, float]:
-    target_power = np.mean(target ** 2)
-    noise_power = np.mean(noise ** 2)
-    
-    if noise_power < 1e-8:
-        return target.copy(), 1.0, 0.0
-    
-    if target_power < 1e-8:
-        return noise * 0.001, 0.0, 0.001
+    target_power, noise_power = np.mean(target ** 2), np.mean(noise ** 2)
+    if noise_power < 1e-8: return target.copy(), 1.0, 0.0
+    if target_power < 1e-8: return noise * 0.001, 0.0, 0.001
     
     target_snr_linear = 10 ** (target_snr_db / 10)
-    
     noise_scale = np.sqrt(target_power / (noise_power * target_snr_linear))
-    
     scaled_noise = noise * noise_scale
-    
     mixture = target + scaled_noise
     
     max_amplitude = np.max(np.abs(mixture))
+    target_scale = 1.0
     if max_amplitude > 1.0:
-        normalization_factor = 0.95 / max_amplitude
-        mixture = mixture * normalization_factor
-        target_scale = normalization_factor
-        noise_scale = noise_scale * normalization_factor
-    else:
-        target_scale = 1.0
+        norm_factor = 0.95 / max_amplitude
+        mixture *= norm_factor
+        target_scale = norm_factor
+        noise_scale *= norm_factor
     
     return mixture, target_scale, noise_scale
 
@@ -120,193 +84,177 @@ class RawStems(Dataset):
         self,
         target_stem: str,
         root_directory: Union[str, Path],
-        file_list: Optional[Union[str, Path]] = None,
+        file_list: Union[str, Path],
         sr: int = 44100,
         clip_duration: float = 3.0,
         snr_range: Tuple[float, float] = (0.0, 10.0),
         apply_augmentation: bool = True,
+        rms_threshold: float = -40.0,
     ) -> None:
+        self.root_directory = Path(root_directory)
+        self.sr = sr
+        self.clip_duration = clip_duration
+        self.snr_range = snr_range
+        self.apply_augmentation = apply_augmentation
+        self.rms_threshold = rms_threshold
 
         self.folders = []
         with open(file_list, 'r') as f:
             for line in f:
-                folder = Path(line.strip())
-                folder = Path(root_directory) / folder
-                if folder.exists():
-                    self.folders.append(folder)
-                else:
-                    logger.warning(f"Folder does not exist: {folder}")
-                
-        self.sr = sr
-        self.clip_duration = clip_duration + 1.
-        self.snr_range = snr_range
-        self.apply_augmentation = apply_augmentation
+                folder = self.root_directory / Path(line.strip())
+                if folder.exists(): self.folders.append(folder)
+                else: logger.warning(f"Folder does not exist: {folder}")
         
-        target_stem = target_stem.split("_")
-        self.target_stem_1 = target_stem[0].strip()
-        if len(target_stem) > 1:
-            self.target_stem_2 = target_stem[1].strip()
-        else:
-            self.target_stem_2 = None
+        target_stem_parts = target_stem.split("_")
+        self.target_stem_1 = target_stem_parts[0].strip()
+        self.target_stem_2 = target_stem_parts[1].strip() if len(target_stem_parts) > 1 else None
         
-        self.audio_files = self._find_audio_files()
-        
-        if len(self.audio_files) == 0:
-            raise ValueError(f"No audio files found in the specified folders")
+        self.audio_files = self._index_audio_files()
+        if not self.audio_files: raise ValueError("No audio files found.")
+            
+        self.activity_masks = self._compute_activity_masks()
         
         self.stem_augmentation = StemAugmentation()
         self.mixture_augmentation = MixtureAugmentation()
-    
-    def _find_audio_files(self) -> Dict[str, List[Path]]:
-        audio_files = []
-        audio_dict = {
-            "target_stems": [],
-            "others": []
-        }
+
+    def _compute_activity_masks(self) -> Dict[str, np.ndarray]:
+        rms_analysis_path = self.root_directory / "rms_analysis.jsonl"
+        if not rms_analysis_path.exists():
+            logger.warning("rms_analysis.jsonl not found. Non-silent selection will be disabled.")
+            return {}
         
+        logger.info(f"Loading and processing RMS data from {rms_analysis_path}")
+        rms_data = {}
+        with open(rms_analysis_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    rms_data[data['filepath']] = np.array(data['rms_db_per_second'])
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+        logger.info("Computing activity masks for all indexed files...")
+        activity_masks = {}
+        window_size = int(np.ceil(self.clip_duration))
+
+        all_indexed_files = set()
+        for song in self.audio_files:
+            all_indexed_files.update(p.relative_to(self.root_directory) for p in song["target_stems"])
+            all_indexed_files.update(p.relative_to(self.root_directory) for p in song["others"])
+
+        for relative_path in tqdm(all_indexed_files, desc="Computing Activity Masks"):
+            path_str = str(relative_path)
+            if path_str in rms_data:
+                rms_values = rms_data[path_str]
+                if len(rms_values) < window_size:
+                    activity_masks[path_str] = np.array([False] * len(rms_values))
+                    continue
+                
+                # Efficiently check if the average RMS in a sliding window is above the threshold
+                is_loud = rms_values > self.rms_threshold
+                sum_loud = np.convolve(is_loud, np.ones(window_size), 'valid')
+                avg_loud_enough = sum_loud / window_size > 0.8 # At least 80% of seconds must be loud
+                
+                # Pad the mask to match the original length of rms_values
+                mask = np.zeros(len(rms_values), dtype=bool)
+                mask[:len(avg_loud_enough)] = avg_loud_enough
+                activity_masks[path_str] = mask
+        return activity_masks
+
+    def _find_common_valid_start_seconds(self, file_paths: List[Path]) -> List[int]:
+        if not self.activity_masks: return []
+
+        common_mask = None
+        min_len = float('inf')
+
+        masks_to_intersect = []
+        for file_path in file_paths:
+            path_str = str(file_path.relative_to(self.root_directory))
+            mask = self.activity_masks.get(path_str)
+            if mask is None: return [] # This file has no mask, combination is invalid
+            masks_to_intersect.append(mask)
+            min_len = min(min_len, len(mask))
+        
+        if not masks_to_intersect: return []
+
+        # Truncate all masks to the minimum length and intersect
+        final_mask = np.ones(min_len, dtype=bool)
+        for mask in masks_to_intersect:
+            final_mask &= mask[:min_len]
+
+        return np.where(final_mask)[0].tolist()
+
+    def _index_audio_files(self) -> List[Dict[str, List[Path]]]:
+        indexed_songs = []
         for folder in tqdm(self.folders, desc="Indexing audio files"):
-            if not folder.exists():
-                logger.warning(f"Folder does not exist: {folder}")
-                continue
+            song_dict = {"target_stems": [], "others": []}
             target_folder = folder / self.target_stem_1
-            
-            if self.target_stem_2:
-                target_folder = target_folder / self.target_stem_2
+            if self.target_stem_2: target_folder /= self.target_stem_2
             
             if target_folder.exists():
-                for file_path in target_folder.rglob('*'):
-                    if file_path.suffix.lower() in AUDIO_EXTENSIONS:
-                        audio_dict["target_stems"].append(file_path)
+                song_dict["target_stems"].extend(p for p in target_folder.rglob('*') if p.suffix.lower() in AUDIO_EXTENSIONS)
             
-            for file_path in folder.rglob('*'):
-                if file_path.suffix.lower() in AUDIO_EXTENSIONS:
-                    relative_path = file_path.relative_to(folder)
-                    parts = relative_path.parts
-                    
-                    if len(parts) > 0 and parts[0] == self.target_stem_1:
-                        if self.target_stem_2 is None:
-                            continue
-                        elif len(parts) > 1 and parts[1] == self.target_stem_2:
-                            continue
-                    
-                    audio_dict["others"].append(file_path)
+            for p in folder.rglob('*'):
+                if p.suffix.lower() in AUDIO_EXTENSIONS:
+                    try:
+                        relative_path = p.relative_to(folder)
+                        parts = relative_path.parts
+                        is_target = len(parts) > 0 and parts[0] == self.target_stem_1 and \
+                                    (self.target_stem_2 is None or (len(parts) > 1 and parts[1] == self.target_stem_2))
+                        if not is_target:
+                            song_dict["others"].append(p)
+                    except ValueError:
+                        continue # Should not happen if p is from folder.rglob
             
-            audio_files.append(audio_dict)
-        
-        return audio_files
+            if song_dict["target_stems"] and song_dict["others"]:
+                indexed_songs.append(song_dict)
+        return indexed_songs
     
     def __getitem__(self, index: int) -> Dict[str, Any]:
-
-        max_retries = 10
-        retry_count = 0
+        song_dict = self.audio_files[index]
         
-        while retry_count < max_retries:
-            try:
-                duration = self.clip_duration
-                
-                current_dict = self.audio_files[index]
-                
-                target_stems_available = current_dict["target_stems"]
-                other_stems_available = current_dict["others"]
-                
-                if len(target_stems_available) == 0:
-                    raise ValueError("No target stems available")
-                
-                if len(other_stems_available) == 0:
-                    raise ValueError("No other stems available")
-                
-                num_target_stems = random.randint(1, min(len(target_stems_available), 10))
-                selected_target_files = random.sample(target_stems_available, num_target_stems)
-                
-                num_other_stems = random.randint(1, min(len(other_stems_available), 20))
-                selected_other_files = random.sample(other_stems_available, num_other_stems)
-                
-                min_duration = float('inf')
-                for file_path in selected_target_files + selected_other_files:
-                    file_duration = get_audio_duration(file_path)
-                    min_duration = min(min_duration, file_duration)
-                
-                max_offset = max(0, min_duration - self.clip_duration)
-                offset = random.uniform(0, max_offset) if max_offset > 0 else 0
-                
-                target_mix = None
-                
-                for file_path in selected_target_files:
-                    audio = load_audio(file_path, offset, self.clip_duration, self.sr)
-                    
-                    if target_mix is None:
-                        target_mix = audio.copy()
-                    else:
-                        target_mix += fix_length(audio, target_mix)
-                
-                if num_target_stems > 1:
-                    target_mix = target_mix / num_target_stems
-                
-                other_mix = None
+        for _ in range(100):
+            num_targets = random.randint(1, min(len(song_dict["target_stems"]), 5))
+            selected_targets = random.sample(song_dict["target_stems"], num_targets)
+            
+            num_others = random.randint(1, min(len(song_dict["others"]), 10))
+            selected_others = random.sample(song_dict["others"], num_others)
 
-                for file_path in selected_other_files:
-                    audio = load_audio(file_path, offset, self.clip_duration, self.sr)
-                    
-                    if other_mix is None:
-                        other_mix = audio.copy()
-                    else:
-                        other_mix += fix_length(audio, other_mix)
+            valid_starts = self._find_common_valid_start_seconds(selected_targets + selected_others)
+
+            if valid_starts:
+                start_second = random.choice(valid_starts)
+                offset = start_second + random.uniform(0, 1.0 - (self.clip_duration % 1.0 or 1.0))
                 
-                if num_other_stems > 1:
-                    other_mix = other_mix / num_other_stems
-                
+                # --- Audio Loading and Mixing ---
+                target_mix = sum(load_audio(p, offset, self.clip_duration, self.sr) for p in selected_targets) / num_targets
+                other_mix = sum(load_audio(p, offset, self.clip_duration, self.sr) for p in selected_others) / num_others
+
                 if not contains_audio_signal(target_mix) or not contains_audio_signal(other_mix):
-                    retry_count += 1
-                    continue
-                    
+                    continue # Should be rare now, but as a safeguard
+
                 target_clean = target_mix.copy()
-
-                if self.apply_augmentation:
-                    target_augmented = self.stem_augmentation.apply(target_mix, self.sr)
-                else:
-                    target_augmented = target_mix
-                    
-                target_augmented = fix_length_to_duration(target_augmented, self.clip_duration, self.sr)
-                other_mix = fix_length_to_duration(other_mix, self.clip_duration, self.sr)
+                target_augmented = self.stem_augmentation.apply(target_mix, self.sr) if self.apply_augmentation else target_mix
                 
-                if np.random.rand() < 0.5 and other_mix is not None:
-                    noise = np.random.normal(0, 0.01, other_mix.shape)
-                    other_mix += noise * np.random.uniform(0.1, 0.5)
-                
-                mixture, target_scale, noise_scale = mix_to_target_snr(
-                    target_augmented, other_mix, random.uniform(self.snr_range[0], self.snr_range[1])
+                mixture, target_scale, _ = mix_to_target_snr(
+                    target_augmented, other_mix, random.uniform(*self.snr_range)
                 )
-                target_clean = target_clean * target_scale
-
-                if self.apply_augmentation:
-                    mixture_augmented = self.mixture_augmentation.apply(mixture, self.sr)
-                else:
-                    mixture_augmented = mixture.copy()
-                    
-                mixture_augmented = fix_length_to_duration(mixture_augmented, self.clip_duration, self.sr)
+                target_clean *= target_scale
                 
-                max_scale = np.max(np.abs(mixture_augmented)) + 1e-7
-                mixture_augmented = mixture_augmented / max_scale
-                target_augmented = target_augmented / max_scale
-                target_clean = target_clean / max_scale
+                mixture_augmented = self.mixture_augmentation.apply(mixture, self.sr) if self.apply_augmentation else mixture
+
+                # --- Normalization and final prep ---
+                max_val = np.max(np.abs(mixture_augmented)) + 1e-8
+                mixture_final = mixture_augmented / max_val
+                target_final = target_clean / max_val
                 
                 rescale = np.random.uniform(*DEFAULT_GAIN_RANGE)
                 
-                target_clean = fix_length_to_duration(target_clean, self.clip_duration, self.sr)
-                mixture_augmented = fix_length_to_duration(mixture_augmented, self.clip_duration, self.sr)
-                
-                target_clean = np.nan_to_num(target_clean)
-                mixture_augmented = np.nan_to_num(mixture_augmented)
-                
                 return {
-                    "target": target_clean[:int((self.clip_duration-1)*self.sr)] * rescale,
-                    "mixture": mixture_augmented[:int((self.clip_duration-1)*self.sr)] * rescale
+                    "mixture": np.nan_to_num(mixture_final * rescale),
+                    "target": np.nan_to_num(target_final * rescale)
                 }
-                
-            except Exception as e:
-                logger.error(f"Error in __getitem__ at index {index}: {e}")
-                retry_count += 1
-        
+
         return self.__getitem__(random.randint(0, len(self.audio_files) - 1))
 
     def __len__(self) -> int:
@@ -314,7 +262,6 @@ class RawStems(Dataset):
 
 
 class InfiniteSampler(Sampler):
-    
     def __init__(self, dataset: Dataset) -> None:
         self.dataset_size = len(dataset)
         self.indexes = list(range(self.dataset_size))
@@ -326,40 +273,37 @@ class InfiniteSampler(Sampler):
         
     def __iter__(self):
         while True:
-            if self.pointer >= self.dataset_size:
-                self.reset()
-                
-            index = self.indexes[self.pointer]
+            if self.pointer >= self.dataset_size: self.reset()
+            yield self.indexes[self.pointer]
             self.pointer += 1
-            yield index
 
-if __name__ == "__main__":    
-    from tqdm import tqdm
-    target_stems = ["Voc", "Bass", "Gtr", "Kbs", "Rhy", "Orch", "Synth", "Gtr_AG", "Gtr_EG"]
+if __name__ == "__main__":
+    root = "/lan/ifc/downloaded_datasets/cambridge-mt/sorted_files"
+    dataset = RawStems(
+        target_stem="Voc",
+        root_directory=root,
+        file_list="/home/yongyizang/music_source_restoration/configs/data_split/Voc_train.txt",
+        sr=44100,
+        clip_duration=10.0,
+        apply_augmentation=True,
+        rms_threshold=-30.0
+    )
+
+    sampler = InfiniteSampler(dataset)
+    iterator = iter(sampler)
     
-    for target_stem in tqdm(target_stems):
-        output_dir = "/root/autodl-tmp/msr_test_set/" + target_stem + "/"
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        logger.info(f"Output directory created: {output_dir}")
-    
-        dataset = RawStems(
-            target_stem=target_stem,
-            root_directory="/root/autodl-tmp/",
-            file_list="/root/music_source_restoration/configs/data_split/" + target_stem + "_test.txt",
-            sr=44100,
-            clip_duration=10.0,
-            apply_augmentation=True
-        )
+    output_dir = Path("./msr_test_set/Voc/")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Output directory: {output_dir}")
+
+    for i in tqdm(range(10), desc="Generating test samples"):
+        index = next(iterator)
+        sample = dataset[index]
         
-        sampler = InfiniteSampler(dataset)
+        mixture_path = output_dir / f"mixture_{i}.wav"
+        target_path = output_dir / f"target_{i}.wav"
         
-        for i in tqdm(range(1000), desc="Sampling"):
-            index = next(iter(sampler))
-            sample = dataset[index]
-            sample["mixture"] = sample["mixture"][:, :441000]
-            sample["target"] = sample["target"][:, :441000]
-            mixture_path = Path(output_dir) / f"mixture_{i}.wav"
-            target_path = Path(output_dir) / f"target_{i}.wav"
-            
-            sf.write(mixture_path, sample["mixture"].T, dataset.sr)
-            sf.write(target_path, sample["target"].T, dataset.sr)
+        sf.write(mixture_path, sample["mixture"].T, dataset.sr)
+        sf.write(target_path, sample["target"].T, dataset.sr)
+
+    print("Test complete.")
