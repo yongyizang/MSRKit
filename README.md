@@ -14,7 +14,6 @@ The repository is organized to separate concerns, making it easy to extend and m
 - `train.py`                  <- Main script to start training
 - `unwrap.py`                 <- Utility to extract generator weights from a checkpoint
 - `data/`                     <- [Data loading and augmentation](./data/README.md)
-- `evaluation/`               <- [Evaluation metrics](./evaluation/README.md)
 - `losses/`                   <- [Loss function implementations](./losses/README.md)
 - `models/`                   <- [Top-level generator model architectures](./models/README.md)
 - `modules/`                  <- [Core building blocks for models](./modules/README.md)
