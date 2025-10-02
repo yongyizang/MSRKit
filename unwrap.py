@@ -1,5 +1,5 @@
 import torch
-import argparse
+import os, glob
 from collections import OrderedDict
 from pathlib import Path
 
@@ -33,22 +33,9 @@ def unwrap_generator_checkpoint(ckpt_path: str, output_path: str) -> None:
     torch.save(generator_state_dict, output_path)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Unwrap a generator model from a PyTorch Lightning checkpoint."
-    )
-    parser.add_argument(
-        '--ckpt', 
-        type=str, 
-        required=True, 
-        help="Path to the input PyTorch Lightning checkpoint file (.ckpt)."
-    )
-    parser.add_argument(
-        '--out', 
-        type=str, 
-        required=True, 
-        help="Path to save the unwrapped generator weights (.pth)."
-    )
-    
-    args = parser.parse_args()
-    
-    unwrap_generator_checkpoint(args.ckpt, args.out)
+    input_dir = "/root/autodl-tmp/checkpoints/mel-unet"
+    # find all .ckpt files in the input directory
+    ckpt_files = glob.glob(os.path.join(input_dir, '*.ckpt'))
+    for ckpt_file in ckpt_files:
+        unwrap_generator_checkpoint(ckpt_file, os.path.join(input_dir, os.path.basename(ckpt_file).replace('.ckpt', '.pth')))
+        print(f"Unwrapped {ckpt_file} to {os.path.join(input_dir, os.path.basename(ckpt_file).replace('.ckpt', '.pth'))}")

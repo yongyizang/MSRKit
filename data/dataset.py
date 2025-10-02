@@ -8,7 +8,7 @@ import json
 from typing import List, Optional, Dict, Union, Tuple, Any
 from torch.utils.data import Dataset, Sampler
 from tqdm import tqdm
-from augment import StemAugmentation, MixtureAugmentation
+from data.augment import StemAugmentation, MixtureAugmentation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -84,8 +84,7 @@ class RawStems(Dataset):
         self,
         target_stem: str,
         root_directory: Union[str, Path],
-        file_list: Union[str, Path],
-        sr: int = 44100,
+        sr: int = 48000,
         clip_duration: float = 3.0,
         snr_range: Tuple[float, float] = (0.0, 10.0),
         apply_augmentation: bool = True,
@@ -97,18 +96,27 @@ class RawStems(Dataset):
         self.snr_range = snr_range
         self.apply_augmentation = apply_augmentation
         self.rms_threshold = rms_threshold
-
-        self.folders = []
-        with open(file_list, 'r') as f:
-            for line in f:
-                folder = self.root_directory / Path(line.strip())
-                if folder.exists(): self.folders.append(folder)
-                else: logger.warning(f"Folder does not exist: {folder}")
         
         target_stem_parts = target_stem.split("_")
         self.target_stem_1 = target_stem_parts[0].strip()
         self.target_stem_2 = target_stem_parts[1].strip() if len(target_stem_parts) > 1 else None
         
+        logger.info(f"Scanning '{self.root_directory}' for songs containing stem '{target_stem}'...")
+        self.folders = []
+        for song_dir in self.root_directory.iterdir():
+            if song_dir.is_dir():
+                target_path = song_dir / self.target_stem_1
+                if self.target_stem_2:
+                    target_path /= self.target_stem_2
+                
+                if target_path.exists() and target_path.is_dir():
+                    self.folders.append(song_dir)
+        
+        if not self.folders:
+            raise FileNotFoundError(f"No subdirectories in '{self.root_directory}' were found containing the stem path '{target_stem}'. "
+                                    f"Please check your directory structure.")
+        logger.info(f"Found {len(self.folders)} song folders.")
+
         self.audio_files = self._index_audio_files()
         if not self.audio_files: raise ValueError("No audio files found.")
             
@@ -150,12 +158,10 @@ class RawStems(Dataset):
                     activity_masks[path_str] = np.array([False] * len(rms_values))
                     continue
                 
-                # Efficiently check if the average RMS in a sliding window is above the threshold
                 is_loud = rms_values > self.rms_threshold
                 sum_loud = np.convolve(is_loud, np.ones(window_size), 'valid')
-                avg_loud_enough = sum_loud / window_size > 0.8 # At least 80% of seconds must be loud
+                avg_loud_enough = sum_loud / window_size > 0.8 
                 
-                # Pad the mask to match the original length of rms_values
                 mask = np.zeros(len(rms_values), dtype=bool)
                 mask[:len(avg_loud_enough)] = avg_loud_enough
                 activity_masks[path_str] = mask
@@ -171,13 +177,12 @@ class RawStems(Dataset):
         for file_path in file_paths:
             path_str = str(file_path.relative_to(self.root_directory))
             mask = self.activity_masks.get(path_str)
-            if mask is None: return [] # This file has no mask, combination is invalid
+            if mask is None: return []
             masks_to_intersect.append(mask)
             min_len = min(min_len, len(mask))
         
         if not masks_to_intersect: return []
 
-        # Truncate all masks to the minimum length and intersect
         final_mask = np.ones(min_len, dtype=bool)
         for mask in masks_to_intersect:
             final_mask &= mask[:min_len]
@@ -204,7 +209,7 @@ class RawStems(Dataset):
                         if not is_target:
                             song_dict["others"].append(p)
                     except ValueError:
-                        continue # Should not happen if p is from folder.rglob
+                        continue
             
             if song_dict["target_stems"] and song_dict["others"]:
                 indexed_songs.append(song_dict)
@@ -226,12 +231,11 @@ class RawStems(Dataset):
                 start_second = random.choice(valid_starts)
                 offset = start_second + random.uniform(0, 1.0 - (self.clip_duration % 1.0 or 1.0))
                 
-                # --- Audio Loading and Mixing ---
                 target_mix = sum(load_audio(p, offset, self.clip_duration, self.sr) for p in selected_targets) / num_targets
                 other_mix = sum(load_audio(p, offset, self.clip_duration, self.sr) for p in selected_others) / num_others
 
                 if not contains_audio_signal(target_mix) or not contains_audio_signal(other_mix):
-                    continue # Should be rare now, but as a safeguard
+                    continue
 
                 target_clean = target_mix.copy()
                 target_augmented = self.stem_augmentation.apply(target_mix, self.sr) if self.apply_augmentation else target_mix
@@ -243,16 +247,28 @@ class RawStems(Dataset):
                 
                 mixture_augmented = self.mixture_augmentation.apply(mixture, self.sr) if self.apply_augmentation else mixture
 
-                # --- Normalization and final prep ---
                 max_val = np.max(np.abs(mixture_augmented)) + 1e-8
                 mixture_final = mixture_augmented / max_val
                 target_final = target_clean / max_val
                 
                 rescale = np.random.uniform(*DEFAULT_GAIN_RANGE)
+
+                mixture = np.nan_to_num(mixture_final * rescale)
+                target = np.nan_to_num(target_final * rescale)
+                
+                target_length = int(self.clip_duration * self.sr)
+                if target.shape[1] != target_length:
+                    target = np.pad(target, (0, target_length - target.shape[1]), mode='constant')
+                else:
+                    target = target[:, :target_length]
+                if mixture.shape[1] != target_length:
+                    mixture = np.pad(mixture, (0, target_length - mixture.shape[1]), mode='constant')
+                else:
+                    mixture = mixture[:, :target_length]
                 
                 return {
-                    "mixture": np.nan_to_num(mixture_final * rescale),
-                    "target": np.nan_to_num(target_final * rescale)
+                    "mixture": np.nan_to_num(mixture),
+                    "target": np.nan_to_num(target)
                 }
 
         return self.__getitem__(random.randint(0, len(self.audio_files) - 1))
@@ -276,34 +292,3 @@ class InfiniteSampler(Sampler):
             if self.pointer >= self.dataset_size: self.reset()
             yield self.indexes[self.pointer]
             self.pointer += 1
-
-if __name__ == "__main__":
-    root = "/lan/ifc/downloaded_datasets/cambridge-mt/sorted_files"
-    dataset = RawStems(
-        target_stem="Voc",
-        root_directory=root,
-        file_list="/home/yongyizang/music_source_restoration/configs/data_split/Voc_train.txt",
-        sr=44100,
-        clip_duration=10.0,
-        apply_augmentation=True,
-        rms_threshold=-30.0
-    )
-
-    sampler = InfiniteSampler(dataset)
-    iterator = iter(sampler)
-    
-    output_dir = Path("./msr_test_set/Voc/")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Output directory: {output_dir}")
-
-    for i in tqdm(range(10), desc="Generating test samples"):
-        index = next(iterator)
-        sample = dataset[index]
-        
-        mixture_path = output_dir / f"mixture_{i}.wav"
-        target_path = output_dir / f"target_{i}.wav"
-        
-        sf.write(mixture_path, sample["mixture"].T, dataset.sr)
-        sf.write(target_path, sample["target"].T, dataset.sr)
-
-    print("Test complete.")

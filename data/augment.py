@@ -1,5 +1,5 @@
 import numpy as np
-from eq_utils import apply_random_eq
+from data.eq_utils import apply_random_eq
 from pedalboard import Pedalboard, Resample, Compressor, Distortion, Reverb, Limiter, MP3Compressor
 
 def fix_length_to_duration(target: np.ndarray, duration: float) -> np.ndarray:

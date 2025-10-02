@@ -23,8 +23,8 @@ class MelUNet(nn.Module):
         
     def forward(self, x):
         original_length = x.shape[1]
-        identity = self.fourier.stft(x)
-        x = self.band.split(identity) # (B, C, T, F)
+        x = self.fourier.stft(x)
+        x = self.band.split(x) # (B, C, T, F)
 
         residuals = []
         for i in range(self.num_layers):
@@ -37,14 +37,13 @@ class MelUNet(nn.Module):
             if i < self.num_layers - 1:
                 x = x + residual
         
-        mask = self.band.unsplit(x)
-        identity = identity * mask
-        x = self.fourier.istft(identity, original_length)
+        x = self.band.unsplit(x)
+        x = self.fourier.istft(x.contiguous(), original_length)
         return x
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = MelUNet(hidden_channels=128, num_layers=2, upsampling_factor=2, window_size=2048, hop_size=512, sample_rate=48000)
+    model = MelUNet(hidden_channels=32, num_layers=4, upsampling_factor=2, window_size=2048, hop_size=512, sample_rate=48000)
     
     x = torch.randn(4, 96000)
     x = x.to(device)

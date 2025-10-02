@@ -25,8 +25,8 @@ class MelRNN(nn.Module):
 
     def forward(self, x):
         original_length = x.shape[1]
-        identity = self.fourier.stft(x)
-        x = self.band.split(identity) # (B, C, T, F)
+        x = self.fourier.stft(x)
+        x = self.band.split(x) # (B, C, T, F)
         
         x = rearrange(x, 'b c t f -> b t f c')
         b, t, f, c = x.shape
@@ -40,13 +40,12 @@ class MelRNN(nn.Module):
             x = rearrange(x, '(b f) t c -> b t f c', f=f)
         
         x = rearrange(x, 'b t f c -> b c t f')
-        mask = self.band.unsplit(x)
-        identity = identity * mask
-        x = self.fourier.istft(identity, original_length)
+        x = self.band.unsplit(x)
+        x = self.fourier.istft(x.contiguous(), original_length)
         return x
 
 if __name__ == "__main__":
-    model = MelRNN(hidden_channels=128, num_layers=12, num_groups=4, window_size=2048, hop_size=512, sample_rate=48000)
+    model = MelRNN(hidden_channels=128, num_layers=9, num_groups=8, window_size=2048, hop_size=512, sample_rate=48000)
     
     x = torch.randn(4, 96000)
     

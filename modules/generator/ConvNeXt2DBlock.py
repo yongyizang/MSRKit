@@ -35,7 +35,7 @@ class ConvNeXt2DBlock(nn.Module):
             self.dwconv = nn.ConvTranspose2d(dim, dim, kernel_size=kernel_size, stride=stride, padding=self.padding)
             self.residual_conv = nn.ConvTranspose2d(dim, output_dim, kernel_size=kernel_size, stride=stride, padding=self.padding)
         self.norm = RMSNorm(dim)
-        self.n_hidden = int(8 * dim / 3)
+        self.n_hidden = int(4 * dim / 3)
         self.pwconv1 = nn.Linear(dim, self.n_hidden * 2)
         self.pwconv2 = nn.Linear(self.n_hidden, output_dim)
 

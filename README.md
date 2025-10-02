@@ -21,6 +21,34 @@ The repository is organized to separate concerns, making it easy to extend and m
      - `discriminator/`       <- Discriminator architectures
      - `generator/`           <- Reusable generator components
 
+## Run Inference On The Pretrained Models
+
+Download from https://huggingface.co/yongyizang/MSRChallengeBaseline, then run `inference.py` to evaluate the pretrained models.
+
+```bash
+python inference.py --config config.yaml --checkpoint path/to/your/checkpoint.ckpt --input_dir path/to/your/input/directory --output_dir path/to/your/output/directory
+```
+
+Every `*.flac` file in the `input_dir` will be processed and saved in the `output_dir`.
+
+## Evaluation Script
+
+Evaluation script is provided in the `calculate_metrics.py` file.
+
+```bash
+python calculate_metrics.py {file list}
+```
+
+The evaluation script is expecting a file list with each line in the format of `{target path}|{output path}`. Results will be printed to the console; you can use ` .. > output.txt` to redirect the output to a file.
+
+We recommend modifying this script to fit your needs.
+
+---
+
+For a comprehensive list of arguments, please check each individual script.
+
+---
+
 ## 🚀 Getting Started
 
 ### 1. Setup
@@ -43,8 +71,6 @@ Key sections to update:
 
   - `data.train_dataset.root_directory`: Path to your training data.
   - `data.train_dataset.file_list`: Path to a `.txt` file listing your training samples.
-  - `data.val_dataset.root_directory`: Path to your validation data.
-  - `data.val_dataset.file_list`: Path to a `.txt` file listing your validation samples.
   - `model`: Choose the generator model and its parameters.
   - `discriminators`: Add and configure one or more discriminators.
   - `trainer`: Set training parameters like `max_steps`, `devices` (GPU IDs), and `precision`.
@@ -56,8 +82,6 @@ Launch the training process using the `train.py` script and your configuration f
 ```bash
 python train.py --config config.yaml
 ```
-
-Logs, checkpoints, and audio samples will be saved in the `lightning_logs/` directory.
 
 ### 4. Unwrap Generator Weights
 
